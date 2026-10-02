@@ -1,0 +1,1701 @@
+{
+  "info": {
+    "_postman_id": "d4e6f8a0-7c9d-4e1f-a3b5-4c6d8e0f2a4b",
+    "name": "IT Topology Graph Service - Blast Radius Suite",
+    "description": "Enterprise-grade E2E Postman Suite for the IT Topology Graph Service Domain (BIAN-aligned, ADR-001/005/013/019/030/031/032). Builds a real web -> app -> db graph under /it-topology-graph/v1 (Node and Edge initiate, update, control/retire|reactivate, audit-log) and asserts the exact $graphLookup blast radius for DOWNSTREAM, UPSTREAM and BOTH, the maxHops limit and RETIRED-edge exclusion, plus RFC 7807 error_code assertions (400/404/409) and W3C traceparent correlation. Requires an organisationId environment variable populated from the Party Reference Data Directory Service Domain.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "39879181"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Automatically generate standard W3C traceparent (ADR-010) and X-Trace-Id",
+          "function generateHex(len) {",
+          "    let result = '';",
+          "    const chars = '0123456789abcdef';",
+          "    for (let i = 0; i < len; i++) {",
+          "        result += chars.charAt(Math.floor(Math.random() * chars.length));",
+          "    }",
+          "    return result;",
+          "}",
+          "const traceId = generateHex(32);",
+          "const spanId = generateHex(16);",
+          "const traceparent = `00-${traceId}-${spanId}-01`;",
+          "pm.request.headers.upsert({ key: 'traceparent', value: traceparent });",
+          "pm.request.headers.upsert({ key: 'X-Trace-Id', value: traceId });",
+          "pm.environment.set('currentTraceId', traceId);"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00. Infrastructure & Telemetry",
+      "item": [
+        {
+          "name": "Health Check (Aggregated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Health status is UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Liveness Probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Liveness status is UP or UNKNOWN (no probe contributors registered)', () => pm.expect(['UP', 'UNKNOWN']).to.include(pm.response.json().status));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health/liveness",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health",
+                "liveness"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Readiness Probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Readiness status is UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health/readiness",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health",
+                "readiness"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Prometheus Metrics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Contains JVM metrics', () => pm.expect(pm.response.text()).to.include('jvm_memory'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/prometheus",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prometheus"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Swagger UI",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns Swagger UI HTML', () => pm.expect(pm.response.text()).to.include('swagger-ui'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/swagger-ui/index.html",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "swagger-ui",
+                "index.html"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01. Graph Lifecycle & Blast Radius (BIAN Behavior Qualifiers)",
+      "item": [
+        {
+          "name": "01. Initiate Node 'web'",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('extWeb', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('UUID present, ACTIVE', () => { pm.expect(json.id).to.not.be.undefined; pm.expect(json.status).to.eql('ACTIVE'); });",
+                  "pm.environment.set('webId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nodeType\": \"ASSET\",\n  \"externalId\": \"{{extWeb}}\",\n  \"label\": \"web\",\n  \"attributes\": {\n    \"tier\": \"web\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "02. Initiate Node 'app'",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('extApp', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('UUID present, ACTIVE', () => { pm.expect(json.id).to.not.be.undefined; pm.expect(json.status).to.eql('ACTIVE'); });",
+                  "pm.environment.set('appId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nodeType\": \"ASSET\",\n  \"externalId\": \"{{extApp}}\",\n  \"label\": \"app\",\n  \"attributes\": {\n    \"tier\": \"app\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "03. Initiate Node 'db'",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('extDb', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('UUID present, ACTIVE', () => { pm.expect(json.id).to.not.be.undefined; pm.expect(json.status).to.eql('ACTIVE'); });",
+                  "pm.environment.set('dbId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nodeType\": \"ASSET\",\n  \"externalId\": \"{{extDb}}\",\n  \"label\": \"db\",\n  \"attributes\": {\n    \"tier\": \"db\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "04. Initiate Edge web -> app",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('ACTIVE edge', () => pm.expect(json.status).to.eql('ACTIVE'));",
+                  "pm.environment.set('webAppEdgeId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"relationshipType\": \"DEPENDS_ON\",\n  \"sourceNodeId\": \"{{webId}}\",\n  \"targetNodeId\": \"{{appId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "05. Initiate Edge app -> db",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('ACTIVE edge', () => pm.expect(json.status).to.eql('ACTIVE'));",
+                  "pm.environment.set('appDbEdgeId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"relationshipType\": \"DEPENDS_ON\",\n  \"sourceNodeId\": \"{{appId}}\",\n  \"targetNodeId\": \"{{dbId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "06. Retrieve Node By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('label is web', () => pm.expect(pm.response.json().label).to.eql('web'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{webId}}/retrieve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{webId}}",
+                "retrieve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "07. Blast Radius web DOWNSTREAM (what web depends on)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Impact set is exactly {\"app\":1,\"db\":2}', () => {",
+                  "    const hops = {};",
+                  "    json.impactedNodes.forEach(n => hops[n.label] = n.hops);",
+                  "    pm.expect(hops).to.eql({\"app\":1,\"db\":2});",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{webId}}/blast-radius/retrieve?direction=DOWNSTREAM",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{webId}}",
+                "blast-radius",
+                "retrieve"
+              ],
+              "query": [
+                {
+                  "key": "direction",
+                  "value": "DOWNSTREAM"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "08. Blast Radius db UPSTREAM (what is hit if db fails)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Impact set is exactly {\"app\":1,\"web\":2}', () => {",
+                  "    const hops = {};",
+                  "    json.impactedNodes.forEach(n => hops[n.label] = n.hops);",
+                  "    pm.expect(hops).to.eql({\"app\":1,\"web\":2});",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{dbId}}/blast-radius/retrieve?direction=UPSTREAM",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{dbId}}",
+                "blast-radius",
+                "retrieve"
+              ],
+              "query": [
+                {
+                  "key": "direction",
+                  "value": "UPSTREAM"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "09. Blast Radius app BOTH",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Impact set is exactly {\"web\":1,\"db\":1}', () => {",
+                  "    const hops = {};",
+                  "    json.impactedNodes.forEach(n => hops[n.label] = n.hops);",
+                  "    pm.expect(hops).to.eql({\"web\":1,\"db\":1});",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{appId}}/blast-radius/retrieve?direction=BOTH",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{appId}}",
+                "blast-radius",
+                "retrieve"
+              ],
+              "query": [
+                {
+                  "key": "direction",
+                  "value": "BOTH"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "10. Blast Radius web DOWNSTREAM limited to maxHops=1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Impact set is exactly {\"app\":1}', () => {",
+                  "    const hops = {};",
+                  "    json.impactedNodes.forEach(n => hops[n.label] = n.hops);",
+                  "    pm.expect(hops).to.eql({\"app\":1});",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{webId}}/blast-radius/retrieve?direction=DOWNSTREAM&maxHops=1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{webId}}",
+                "blast-radius",
+                "retrieve"
+              ],
+              "query": [
+                {
+                  "key": "direction",
+                  "value": "DOWNSTREAM"
+                },
+                {
+                  "key": "maxHops",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "11. Update Node (label and attributes)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{appId}}/update",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{appId}}",
+                "update"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"app\",\n  \"attributes\": {\n    \"tier\": \"app\",\n    \"owner\": \"platform\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "12. Control Edge: Retire (app -> db)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/{{appDbEdgeId}}/control/retire",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "{{appDbEdgeId}}",
+                "control",
+                "retire"
+              ]
+            }
+          }
+        },
+        {
+          "name": "13. Blast Radius web DOWNSTREAM ignores the RETIRED edge",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Impact set is exactly {\"app\":1}', () => {",
+                  "    const hops = {};",
+                  "    json.impactedNodes.forEach(n => hops[n.label] = n.hops);",
+                  "    pm.expect(hops).to.eql({\"app\":1});",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{webId}}/blast-radius/retrieve?direction=DOWNSTREAM",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{webId}}",
+                "blast-radius",
+                "retrieve"
+              ],
+              "query": [
+                {
+                  "key": "direction",
+                  "value": "DOWNSTREAM"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "14. Control Edge: Reactivate (app -> db)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/{{appDbEdgeId}}/control/reactivate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "{{appDbEdgeId}}",
+                "control",
+                "reactivate"
+              ]
+            }
+          }
+        },
+        {
+          "name": "15. Retrieve Node Audit Ledger",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('INITIATED then UPDATED', () => {",
+                  "    pm.expect(json).to.be.an('array').with.lengthOf(2);",
+                  "    pm.expect(json[0].action).to.eql('INITIATED');",
+                  "    pm.expect(json[1].action).to.eql('UPDATED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{appId}}/audit-log/retrieve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{appId}}",
+                "audit-log",
+                "retrieve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "16. Retrieve Edges touching a Node (either endpoint)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('both edges of app', () => pm.expect(pm.response.json()).to.be.an('array').with.lengthOf(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/retrieve?nodeId={{appId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "retrieve"
+              ],
+              "query": [
+                {
+                  "key": "nodeId",
+                  "value": "{{appId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "17. Retrieve Nodes (collection, nodeType=ASSET)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('contains our three nodes', () => { const ids = pm.response.json().map(n => n.id); ['webId','appId','dbId'].forEach(k => pm.expect(ids).to.include(pm.environment.get(k))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/retrieve?nodeType=ASSET",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "retrieve"
+              ],
+              "query": [
+                {
+                  "key": "nodeType",
+                  "value": "ASSET"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Negative Tests & Boundary Validation",
+      "item": [
+        {
+          "name": "01. Initiate Node - Missing nodeType (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-VALIDATION-00400', () => {",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.error_code).to.eql('ERR-VALIDATION-00400');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"externalId\": \"00000000-0000-0000-0000-000000000001\",\n  \"label\": \"x\"\n}"
+            }
+          }
+        },
+        {
+          "name": "02. Initiate Node - Missing X-Tenant-Id Header (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nodeType\": \"ASSET\",\n  \"externalId\": \"00000000-0000-0000-0000-000000000001\",\n  \"label\": \"x\"\n}"
+            }
+          }
+        },
+        {
+          "name": "03. Retrieve Node - Non-existent UUID (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-TPG-00404', () => {",
+                  "    pm.expect(json.status).to.eql(404);",
+                  "    pm.expect(json.error_code).to.eql('ERR-TPG-00404');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/00000000-0000-0000-0000-000000000000/retrieve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "00000000-0000-0000-0000-000000000000",
+                "retrieve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "04. Retrieve Node - Malformed UUID Path (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/not-a-uuid/retrieve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "not-a-uuid",
+                "retrieve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "05. Initiate Node - Duplicate (nodeType, externalId) (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-TPG-00409', () => {",
+                  "    pm.expect(json.status).to.eql(409);",
+                  "    pm.expect(json.error_code).to.eql('ERR-TPG-00409');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nodeType\": \"ASSET\",\n  \"externalId\": \"{{extWeb}}\",\n  \"label\": \"web again\"\n}"
+            }
+          }
+        },
+        {
+          "name": "06. Initiate Edge - Self-loop (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-VALIDATION-00400', () => {",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.error_code).to.eql('ERR-VALIDATION-00400');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"relationshipType\": \"DEPENDS_ON\",\n  \"sourceNodeId\": \"{{webId}}\",\n  \"targetNodeId\": \"{{webId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "07. Initiate Edge - Unknown endpoint (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-TPG-00404', () => {",
+                  "    pm.expect(json.status).to.eql(404);",
+                  "    pm.expect(json.error_code).to.eql('ERR-TPG-00404');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"relationshipType\": \"DEPENDS_ON\",\n  \"sourceNodeId\": \"{{webId}}\",\n  \"targetNodeId\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            }
+          }
+        },
+        {
+          "name": "08. Initiate Edge - Duplicate (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-TPG-00409', () => {",
+                  "    pm.expect(json.status).to.eql(409);",
+                  "    pm.expect(json.error_code).to.eql('ERR-TPG-00409');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"relationshipType\": \"DEPENDS_ON\",\n  \"sourceNodeId\": \"{{webId}}\",\n  \"targetNodeId\": \"{{appId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "09. Blast Radius - maxHops=11 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-VALIDATION-00400', () => {",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.error_code).to.eql('ERR-VALIDATION-00400');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{webId}}/blast-radius/retrieve?maxHops=11",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{webId}}",
+                "blast-radius",
+                "retrieve"
+              ],
+              "query": [
+                {
+                  "key": "maxHops",
+                  "value": "11"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "10. Blast Radius - maxHops=0 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-VALIDATION-00400', () => {",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.error_code).to.eql('ERR-VALIDATION-00400');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{webId}}/blast-radius/retrieve?maxHops=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{webId}}",
+                "blast-radius",
+                "retrieve"
+              ],
+              "query": [
+                {
+                  "key": "maxHops",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "11. Control Node: Retire db (Setup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{dbId}}/control/retire",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{dbId}}",
+                "control",
+                "retire"
+              ]
+            }
+          }
+        },
+        {
+          "name": "12. Control Node: Retire an Already-RETIRED Node (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-TPG-00409', () => {",
+                  "    pm.expect(json.status).to.eql(409);",
+                  "    pm.expect(json.error_code).to.eql('ERR-TPG-00409');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{dbId}}/control/retire",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{dbId}}",
+                "control",
+                "retire"
+              ]
+            }
+          }
+        },
+        {
+          "name": "13. Update a RETIRED Node (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-TPG-00409', () => {",
+                  "    pm.expect(json.status).to.eql(409);",
+                  "    pm.expect(json.error_code).to.eql('ERR-TPG-00409');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/{{dbId}}/update",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{dbId}}",
+                "update"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"db renamed\"\n}"
+            }
+          }
+        },
+        {
+          "name": "14. Initiate Edge to a RETIRED Node (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-TPG-00409', () => {",
+                  "    pm.expect(json.status).to.eql(409);",
+                  "    pm.expect(json.error_code).to.eql('ERR-TPG-00409');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/initiate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"relationshipType\": \"HOSTS\",\n  \"sourceNodeId\": \"{{webId}}\",\n  \"targetNodeId\": \"{{dbId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "15. Control Edge: Retire app -> db (Setup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/{{appDbEdgeId}}/control/retire",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "{{appDbEdgeId}}",
+                "control",
+                "retire"
+              ]
+            }
+          }
+        },
+        {
+          "name": "16. Control Edge: Reactivate while db is RETIRED (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-TPG-00409', () => {",
+                  "    pm.expect(json.status).to.eql(409);",
+                  "    pm.expect(json.error_code).to.eql('ERR-TPG-00409');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/{{appDbEdgeId}}/control/reactivate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "{{appDbEdgeId}}",
+                "control",
+                "reactivate"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8092"
+    }
+  ]
+}
