@@ -71,10 +71,11 @@ class TopologyPersistenceIT implements TestPropertyProvider {
         UUID organisationId = UUID.randomUUID();
         Node created = node(organisationId, "sw");
 
-        Node updated = nodes.findById(created.getId()).block();
+        Node updated = nodes.findById(created.getId(), organisationId).block();
         AuditEntryHolder.apply(nodes, updated);
 
-        Node found = nodes.findById(created.getId()).block();
+        Node found = nodes.findById(created.getId(), organisationId).block();
+        assertNull(nodes.findById(created.getId(), UUID.randomUUID()).block(), "another tenant's node is the same as none");
         assertEquals(ElementStatus.RETIRED, found.getStatus());
         assertEquals("sw-2", found.getLabel());
         assertEquals(3, found.getAuditTrail().size());
@@ -99,7 +100,7 @@ class TopologyPersistenceIT implements TestPropertyProvider {
         UUID unknown = UUID.randomUUID();
         Node ghost = Node.createNew(unknown, UUID.randomUUID(), "ASSET", UUID.randomUUID(), "g", Map.of(), EXECUTOR);
 
-        assertNull(nodes.findById(unknown).block());
+        assertNull(nodes.findById(unknown, UUID.randomUUID()).block());
         assertThrows(NodeNotFoundException.class, () -> nodes.updateStatus(unknown, ElementStatus.RETIRED, ghost.retire(EXECUTOR)).block());
     }
 

@@ -24,8 +24,8 @@ public class ControlNodeUseCase {
         this.nodeRepository = nodeRepository;
     }
 
-    public Mono<Void> execute(UUID id, Action action, String executor) {
-        return nodeRepository.findById(id)
+    public Mono<Void> execute(UUID id, UUID organisationId, Action action, String executor) {
+        return nodeRepository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new NodeNotFoundException(id)))
                 .flatMap(node -> {
                     AuditEntry entry = action.apply(node, executor);

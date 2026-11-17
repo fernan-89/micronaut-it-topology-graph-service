@@ -18,7 +18,7 @@ public interface NodeRepository {
 
     Mono<Node> create(Node node);
 
-    Mono<Node> findById(UUID id);
+    Mono<Node> findById(UUID id, UUID organisationId);
 
     /** Tenant-scoped listing; {@code nodeType} and {@code status} are optional filters. */
     Flux<Node> findAllByOrganisationId(UUID organisationId, String nodeType, ElementStatus status);

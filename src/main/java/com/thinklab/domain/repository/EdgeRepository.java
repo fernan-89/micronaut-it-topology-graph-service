@@ -13,7 +13,7 @@ public interface EdgeRepository {
 
     Mono<Edge> create(Edge edge);
 
-    Mono<Edge> findById(UUID id);
+    Mono<Edge> findById(UUID id, UUID organisationId);
 
     /**
      * Tenant-scoped listing; every filter except the tenant is optional. {@code nodeId} matches an edge

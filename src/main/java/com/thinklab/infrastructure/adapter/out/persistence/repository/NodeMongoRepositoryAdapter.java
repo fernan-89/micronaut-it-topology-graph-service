@@ -74,8 +74,8 @@ public class NodeMongoRepositoryAdapter implements NodeRepository {
     }
 
     @Override
-    public Mono<Node> findById(UUID id) {
-        return Mono.from(getCollection().find(Filters.eq(FIELD_ID, id)).first()).map(NodePersistenceMapper::toDomain);
+    public Mono<Node> findById(UUID id, UUID organisationId) {
+        return Mono.from(getCollection().find(Filters.and(Filters.eq(FIELD_ID, id), Filters.eq("organisationId", organisationId))).first()).map(NodePersistenceMapper::toDomain);
     }
 
     @Override

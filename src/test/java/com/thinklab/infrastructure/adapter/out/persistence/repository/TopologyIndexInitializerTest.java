@@ -108,7 +108,7 @@ class TopologyIndexInitializerTest {
         when(collection.find(any(Bson.class))).thenReturn(find);
         when(find.first()).thenReturn(Mono.empty());
 
-        new NodeMongoRepositoryAdapter(client, "mongodb://mongo:27017").findById(UUID.randomUUID()).block();
+        new NodeMongoRepositoryAdapter(client, "mongodb://mongo:27017").findById(UUID.randomUUID(), UUID.randomUUID()).block();
 
         verify(client).getDatabase("thinklab_topology_graph_db");
         assertThrows(NullPointerException.class, () -> new NodeMongoRepositoryAdapter(client, null));

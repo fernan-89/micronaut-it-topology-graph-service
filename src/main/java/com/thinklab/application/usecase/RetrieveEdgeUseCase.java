@@ -19,8 +19,8 @@ public class RetrieveEdgeUseCase {
         this.edgeRepository = edgeRepository;
     }
 
-    public Mono<EdgeResponse> execute(UUID id) {
-        return edgeRepository.findById(id)
+    public Mono<EdgeResponse> execute(UUID id, UUID organisationId) {
+        return edgeRepository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new EdgeNotFoundException(id)))
                 .map(TopologyMapper::toResponse);
     }

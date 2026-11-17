@@ -21,8 +21,8 @@ public class RetrieveEdgeAuditLogUseCase {
         this.edgeRepository = edgeRepository;
     }
 
-    public Mono<List<AuditEntryResponse>> execute(UUID id) {
-        return edgeRepository.findById(id)
+    public Mono<List<AuditEntryResponse>> execute(UUID id, UUID organisationId) {
+        return edgeRepository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new EdgeNotFoundException(id)))
                 .flatMapMany(edge -> Flux.fromIterable(edge.getAuditTrail()))
                 .map(TopologyMapper::toResponse)
