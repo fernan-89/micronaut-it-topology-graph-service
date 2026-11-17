@@ -8,6 +8,7 @@ import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import com.thinklab.domain.exception.DuplicateEdgeException;
 import com.thinklab.domain.exception.EdgeNotFoundException;
+import com.thinklab.domain.exception.InvalidNodeStatusException;
 import com.thinklab.domain.model.AuditEntry;
 import com.thinklab.domain.model.Edge;
 import com.thinklab.domain.model.ElementStatus;
@@ -92,9 +93,22 @@ public class EdgeMongoRepositoryAdapter implements EdgeRepository {
                 Updates.set("status", status.name()),
                 Updates.set("updatedAt", Instant.now()),
                 Updates.push("auditTrail", AuditEntryDocument.fromDomain(auditEntry)));
-        return Mono.from(getCollection().updateOne(Filters.eq(FIELD_ID, id), update))
-                .flatMap(result -> result.getMatchedCount() == 0
-                        ? Mono.error(new EdgeNotFoundException(id))
-                        : Mono.<Void>empty());
+        return executeGuarded(id, auditEntry, update);
+    }
+
+    /** A guarded write (platform race audit): only if the edge still has the status the caller read, the {@code fromStatus} of the audit entry. */
+    private Mono<Void> executeGuarded(UUID id, AuditEntry auditEntry, Bson update) {
+        Bson filter = Filters.and(Filters.eq(FIELD_ID, id), Filters.eq("status", auditEntry.fromStatus().name()));
+        return Mono.from(getCollection().updateOne(filter, update))
+                .flatMap(result -> {
+                    if (result.getMatchedCount() > 0) {
+                        return Mono.<Void>empty();
+                    }
+                    return Mono.from(getCollection().countDocuments(Filters.eq(FIELD_ID, id)))
+                            .flatMap(count -> count == 0
+                                    ? Mono.<Void>error(new EdgeNotFoundException(id))
+                                    : Mono.<Void>error(new InvalidNodeStatusException(
+                                            "The edge was changed by someone else while this change was being recorded; read it again and retry.")));
+                });
     }
 }

@@ -74,7 +74,7 @@ the root) or `BOTH` when reached both ways at the same minimum.
 | error_code | HTTP | Meaning |
 |---|---|---|
 | `ERR-TPG-00404` | 404 | Node or Edge not found (also: a node of another tenant) |
-| `ERR-TPG-00409` | 409 | Duplicate node/edge key, illegal lifecycle transition, or a RETIRED endpoint (ADR-019/032) |
+| `ERR-TPG-00409` | 409 | Duplicate node/edge key, illegal lifecycle transition, a RETIRED endpoint (ADR-019/032), or a change that lost a race with another on the same element (ADR-033) |
 | `ERR-VALIDATION-00400` | 400 | Payload/header/identifier validation failure, self-loop, or `maxHops` outside 1..10 |
 | `ERR-INTERNAL-00500` | 500 | Unexpected technical failure |
 

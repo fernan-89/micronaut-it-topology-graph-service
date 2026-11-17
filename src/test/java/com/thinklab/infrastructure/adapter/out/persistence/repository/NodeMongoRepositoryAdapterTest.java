@@ -211,12 +211,33 @@ class NodeMongoRepositoryAdapterTest {
     }
 
     @Test
-    @DisplayName("every partial update fails with NodeNotFoundException when no document matches")
+    @DisplayName("every guarded update that matches nothing is a 404 when the node does not exist and a conflict when it does")
     void updatesFailWhenNothingMatches() {
         when(mongoCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(Mono.just(UpdateResult.acknowledged(0, 0L, null)));
         AuditEntry entry = node.retire("tech");
 
+        when(mongoCollection.countDocuments(any(Bson.class))).thenReturn(Mono.just(0L));
         StepVerifier.create(adapter.updateStatus(node.getId(), ElementStatus.RETIRED, entry)).expectError(NodeNotFoundException.class).verify();
         StepVerifier.create(adapter.updateInfo(node.getId(), "l", Map.of(), entry)).expectError(NodeNotFoundException.class).verify();
+
+        when(mongoCollection.countDocuments(any(Bson.class))).thenReturn(Mono.just(1L));
+        StepVerifier.create(adapter.updateStatus(node.getId(), ElementStatus.RETIRED, entry))
+                .expectError(com.thinklab.domain.exception.InvalidNodeStatusException.class).verify();
+    }
+
+    @Test
+    @DisplayName("every write filters on the id and on the status that was read (the audit entry's fromStatus)")
+    void writesFilterOnTheStatusRead() {
+        when(mongoCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(Mono.just(UpdateResult.acknowledged(1, 1L, null)));
+        AuditEntry entry = node.retire("tech");
+
+        StepVerifier.create(adapter.updateStatus(node.getId(), ElementStatus.RETIRED, entry)).verifyComplete();
+
+        org.mockito.ArgumentCaptor<Bson> filter = org.mockito.ArgumentCaptor.forClass(Bson.class);
+        org.mockito.Mockito.verify(mongoCollection).updateOne(filter.capture(), any(Bson.class));
+        String json = filter.getValue().toBsonDocument(org.bson.BsonDocument.class, CodecRegistries.fromRegistries(
+                CodecRegistries.fromCodecs(new org.bson.codecs.UuidCodec(org.bson.UuidRepresentation.STANDARD)),
+                com.mongodb.MongoClientSettings.getDefaultCodecRegistry())).toJson();
+        org.junit.jupiter.api.Assertions.assertTrue(json.contains("_id") && json.contains("status") && json.contains("ACTIVE"), json);
     }
 }

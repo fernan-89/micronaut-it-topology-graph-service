@@ -100,7 +100,7 @@ class TopologyPersistenceIT implements TestPropertyProvider {
         Node ghost = Node.createNew(unknown, UUID.randomUUID(), "ASSET", UUID.randomUUID(), "g", Map.of(), EXECUTOR);
 
         assertNull(nodes.findById(unknown).block());
-        assertThrows(NodeNotFoundException.class, () -> nodes.updateStatus(unknown, ElementStatus.RETIRED, ghost.getAuditTrail().get(0)).block());
+        assertThrows(NodeNotFoundException.class, () -> nodes.updateStatus(unknown, ElementStatus.RETIRED, ghost.retire(EXECUTOR)).block());
     }
 
     @Test
