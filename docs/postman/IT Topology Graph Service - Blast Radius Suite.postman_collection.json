@@ -1880,7 +1880,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 404 (another tenant's object is the same as none)', () => pm.response.to.have.status(404));"
+                  "pm.test('Status is 404 (another tenant\\'s object is the same as none)', () => pm.response.to.have.status(404));"
                 ],
                 "type": "text/javascript"
               }
@@ -1920,7 +1920,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 404 (another tenant's object is the same as none)', () => pm.response.to.have.status(404));"
+                  "pm.test('Status is 404 (another tenant\\'s object is the same as none)', () => pm.response.to.have.status(404));"
                 ],
                 "type": "text/javascript"
               }
