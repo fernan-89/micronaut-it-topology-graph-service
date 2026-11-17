@@ -178,11 +178,17 @@ class EdgeMongoRepositoryAdapterTest {
     }
 
     @Test
-    @DisplayName("updateStatus fails with EdgeNotFoundException when no document matches")
+    @DisplayName("updateStatus is a guarded write: no match is a 404 when the edge does not exist and a conflict when it does")
     void updateStatusNotFound() {
         when(mongoCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(Mono.just(UpdateResult.acknowledged(0, 0L, null)));
+        var entry = edge.retire("tech");
 
-        StepVerifier.create(adapter.updateStatus(edge.getId(), ElementStatus.RETIRED, edge.retire("tech")))
+        when(mongoCollection.countDocuments(any(Bson.class))).thenReturn(Mono.just(0L));
+        StepVerifier.create(adapter.updateStatus(edge.getId(), ElementStatus.RETIRED, entry))
                 .expectError(EdgeNotFoundException.class).verify();
+
+        when(mongoCollection.countDocuments(any(Bson.class))).thenReturn(Mono.just(1L));
+        StepVerifier.create(adapter.updateStatus(edge.getId(), ElementStatus.RETIRED, entry))
+                .expectError(com.thinklab.domain.exception.InvalidNodeStatusException.class).verify();
     }
 }

@@ -7,6 +7,7 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import com.thinklab.domain.exception.DuplicateNodeException;
+import com.thinklab.domain.exception.InvalidNodeStatusException;
 import com.thinklab.domain.exception.NodeNotFoundException;
 import com.thinklab.domain.model.AuditEntry;
 import com.thinklab.domain.model.ElementStatus;
@@ -99,7 +100,7 @@ public class NodeMongoRepositoryAdapter implements NodeRepository {
 
     @Override
     public Mono<Void> updateInfo(UUID id, String label, Map<String, String> attributes, AuditEntry auditEntry) {
-        return executeUpdate(id, Updates.combine(
+        return executeGuarded(id, auditEntry, Updates.combine(
                 Updates.set("label", label),
                 Updates.set("attributes", new LinkedHashMap<>(attributes)),
                 Updates.set(FIELD_UPDATED_AT, Instant.now()),
@@ -108,16 +109,25 @@ public class NodeMongoRepositoryAdapter implements NodeRepository {
 
     @Override
     public Mono<Void> updateStatus(UUID id, ElementStatus status, AuditEntry auditEntry) {
-        return executeUpdate(id, Updates.combine(
+        return executeGuarded(id, auditEntry, Updates.combine(
                 Updates.set(FIELD_STATUS, status.name()),
                 Updates.set(FIELD_UPDATED_AT, Instant.now()),
                 Updates.push(FIELD_AUDIT_TRAIL, AuditEntryDocument.fromDomain(auditEntry))));
     }
 
-    private Mono<Void> executeUpdate(UUID id, Bson update) {
-        return Mono.from(getCollection().updateOne(Filters.eq(FIELD_ID, id), update))
-                .flatMap(result -> result.getMatchedCount() == 0
-                        ? Mono.error(new NodeNotFoundException(id))
-                        : Mono.<Void>empty());
+    /** A guarded write (platform race audit): only if the node still has the status the caller read, the {@code fromStatus} of the audit entry. */
+    private Mono<Void> executeGuarded(UUID id, AuditEntry auditEntry, Bson update) {
+        Bson filter = Filters.and(Filters.eq(FIELD_ID, id), Filters.eq("status", auditEntry.fromStatus().name()));
+        return Mono.from(getCollection().updateOne(filter, update))
+                .flatMap(result -> {
+                    if (result.getMatchedCount() > 0) {
+                        return Mono.<Void>empty();
+                    }
+                    return Mono.from(getCollection().countDocuments(Filters.eq(FIELD_ID, id)))
+                            .flatMap(count -> count == 0
+                                    ? Mono.<Void>error(new NodeNotFoundException(id))
+                                    : Mono.<Void>error(new InvalidNodeStatusException(
+                                            "The node was changed by someone else while this change was being recorded; read it again and retry.")));
+                });
     }
 }
