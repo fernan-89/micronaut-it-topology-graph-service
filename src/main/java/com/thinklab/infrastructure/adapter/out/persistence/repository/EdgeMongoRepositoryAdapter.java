@@ -67,8 +67,8 @@ public class EdgeMongoRepositoryAdapter implements EdgeRepository {
     }
 
     @Override
-    public Mono<Edge> findById(UUID id) {
-        return Mono.from(getCollection().find(Filters.eq(FIELD_ID, id)).first()).map(EdgePersistenceMapper::toDomain);
+    public Mono<Edge> findById(UUID id, UUID organisationId) {
+        return Mono.from(getCollection().find(Filters.and(Filters.eq(FIELD_ID, id), Filters.eq("organisationId", organisationId))).first()).map(EdgePersistenceMapper::toDomain);
     }
 
     @Override

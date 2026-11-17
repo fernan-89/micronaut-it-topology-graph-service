@@ -129,8 +129,8 @@ class EdgeMongoRepositoryAdapterTest {
         when(mongoCollection.find(any(Bson.class))).thenReturn(publisher);
         when(publisher.first()).thenReturn(Mono.just(EdgePersistenceMapper.toDocument(edge))).thenReturn(Mono.empty());
 
-        StepVerifier.create(adapter.findById(edge.getId())).expectNextMatches(e -> e.getId().equals(edge.getId())).verifyComplete();
-        StepVerifier.create(adapter.findById(edge.getId())).verifyComplete();
+        StepVerifier.create(adapter.findById(edge.getId(), edge.getOrganisationId())).expectNextMatches(e -> e.getId().equals(edge.getId())).verifyComplete();
+        StepVerifier.create(adapter.findById(edge.getId(), edge.getOrganisationId())).verifyComplete();
     }
 
     @Test

@@ -108,8 +108,8 @@ public class TopologyController {
     }
 
     @Get("/{id}/retrieve")
-    public Mono<HttpResponse<NodeResponse>> retrieveById(@PathVariable UUID id) {
-        return retrieveNodeUseCase.execute(id).map(HttpResponse::ok);
+    public Mono<HttpResponse<NodeResponse>> retrieveById(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId) {
+        return retrieveNodeUseCase.execute(id, UUID.fromString(tenantId)).map(HttpResponse::ok);
     }
 
     @Get("/retrieve")
@@ -123,27 +123,27 @@ public class TopologyController {
 
     @Put("/{id}/update")
     public Mono<HttpResponse<Void>> update(
-            @PathVariable UUID id,
+            @PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId,
             @Header(EXECUTOR_HEADER) @NotBlank String executor,
             @Body @Valid UpdateNodeRequest request
     ) {
         log.info("[ACTION: UPDATE_NODE] [EXECUTOR: {}] node ID: {}", executor, id);
-        return updateNodeUseCase.execute(id, request, executor).thenReturn(HttpResponse.noContent());
+        return updateNodeUseCase.execute(id, UUID.fromString(tenantId), request, executor).thenReturn(HttpResponse.noContent());
     }
 
     @Put("/{id}/control/retire")
-    public Mono<HttpResponse<Void>> controlRetire(@PathVariable UUID id, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
-        return controlNodeUseCase.execute(id, ControlNodeUseCase.Action.RETIRE, executor).thenReturn(HttpResponse.noContent());
+    public Mono<HttpResponse<Void>> controlRetire(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
+        return controlNodeUseCase.execute(id, UUID.fromString(tenantId), ControlNodeUseCase.Action.RETIRE, executor).thenReturn(HttpResponse.noContent());
     }
 
     @Put("/{id}/control/reactivate")
-    public Mono<HttpResponse<Void>> controlReactivate(@PathVariable UUID id, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
-        return controlNodeUseCase.execute(id, ControlNodeUseCase.Action.REACTIVATE, executor).thenReturn(HttpResponse.noContent());
+    public Mono<HttpResponse<Void>> controlReactivate(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
+        return controlNodeUseCase.execute(id, UUID.fromString(tenantId), ControlNodeUseCase.Action.REACTIVATE, executor).thenReturn(HttpResponse.noContent());
     }
 
     @Get("/{id}/audit-log/retrieve")
-    public Mono<List<AuditEntryResponse>> retrieveAuditLog(@PathVariable UUID id) {
-        return retrieveNodeAuditLogUseCase.execute(id);
+    public Mono<List<AuditEntryResponse>> retrieveAuditLog(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId) {
+        return retrieveNodeAuditLogUseCase.execute(id, UUID.fromString(tenantId));
     }
 
     /** Behavior Qualifier: {@code blast-radius/retrieve}. Transitive impact set, tenant-isolated (ADR-031). */
@@ -171,8 +171,8 @@ public class TopologyController {
     }
 
     @Get("/edge/{id}/retrieve")
-    public Mono<HttpResponse<EdgeResponse>> retrieveEdgeById(@PathVariable UUID id) {
-        return retrieveEdgeUseCase.execute(id).map(HttpResponse::ok);
+    public Mono<HttpResponse<EdgeResponse>> retrieveEdgeById(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId) {
+        return retrieveEdgeUseCase.execute(id, UUID.fromString(tenantId)).map(HttpResponse::ok);
     }
 
     @Get("/edge/retrieve")
@@ -186,17 +186,17 @@ public class TopologyController {
     }
 
     @Put("/edge/{id}/control/retire")
-    public Mono<HttpResponse<Void>> controlEdgeRetire(@PathVariable UUID id, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
-        return controlEdgeUseCase.execute(id, ControlEdgeUseCase.Action.RETIRE, executor).thenReturn(HttpResponse.noContent());
+    public Mono<HttpResponse<Void>> controlEdgeRetire(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
+        return controlEdgeUseCase.execute(id, UUID.fromString(tenantId), ControlEdgeUseCase.Action.RETIRE, executor).thenReturn(HttpResponse.noContent());
     }
 
     @Put("/edge/{id}/control/reactivate")
-    public Mono<HttpResponse<Void>> controlEdgeReactivate(@PathVariable UUID id, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
-        return controlEdgeUseCase.execute(id, ControlEdgeUseCase.Action.REACTIVATE, executor).thenReturn(HttpResponse.noContent());
+    public Mono<HttpResponse<Void>> controlEdgeReactivate(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
+        return controlEdgeUseCase.execute(id, UUID.fromString(tenantId), ControlEdgeUseCase.Action.REACTIVATE, executor).thenReturn(HttpResponse.noContent());
     }
 
     @Get("/edge/{id}/audit-log/retrieve")
-    public Mono<List<AuditEntryResponse>> retrieveEdgeAuditLog(@PathVariable UUID id) {
-        return retrieveEdgeAuditLogUseCase.execute(id);
+    public Mono<List<AuditEntryResponse>> retrieveEdgeAuditLog(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId) {
+        return retrieveEdgeAuditLogUseCase.execute(id, UUID.fromString(tenantId));
     }
 }

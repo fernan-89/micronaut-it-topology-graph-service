@@ -28,25 +28,25 @@ public class ControlEdgeUseCase {
         this.nodeRepository = nodeRepository;
     }
 
-    public Mono<Void> execute(UUID id, Action action, String executor) {
-        return edgeRepository.findById(id)
+    public Mono<Void> execute(UUID id, UUID organisationId, Action action, String executor) {
+        return edgeRepository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new EdgeNotFoundException(id)))
-                .flatMap(edge -> guard(edge, action)
+                .flatMap(edge -> guard(edge, action, organisationId)
                         .then(Mono.defer(() -> {
                             AuditEntry entry = action.apply(edge, executor);
                             return edgeRepository.updateStatus(id, action.targetStatus(), entry);
                         })));
     }
 
-    private Mono<Void> guard(Edge edge, Action action) {
+    private Mono<Void> guard(Edge edge, Action action, UUID organisationId) {
         if (action != Action.REACTIVATE) {
             return Mono.empty();
         }
-        return Mono.zip(activeEndpoint(edge.getSourceNodeId()), activeEndpoint(edge.getTargetNodeId())).then();
+        return Mono.zip(activeEndpoint(edge.getSourceNodeId(), organisationId), activeEndpoint(edge.getTargetNodeId(), organisationId)).then();
     }
 
-    private Mono<Boolean> activeEndpoint(UUID nodeId) {
-        return nodeRepository.findById(nodeId)
+    private Mono<Boolean> activeEndpoint(UUID nodeId, UUID organisationId) {
+        return nodeRepository.findById(nodeId, organisationId)
                 .switchIfEmpty(Mono.error(new NodeNotFoundException(nodeId)))
                 .flatMap(node -> node.getStatus() == ElementStatus.ACTIVE
                         ? Mono.just(true)

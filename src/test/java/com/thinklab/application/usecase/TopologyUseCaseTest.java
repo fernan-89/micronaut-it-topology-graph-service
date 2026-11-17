@@ -88,12 +88,12 @@ class TopologyUseCaseTest {
     @Test
     @DisplayName("Retrieve node: found, and 404 when absent")
     void retrieveNode() {
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
-        when(nodeRepository.findById(target.getId())).thenReturn(Mono.empty());
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(target.getId(), target.getOrganisationId())).thenReturn(Mono.empty());
         RetrieveNodeUseCase useCase = new RetrieveNodeUseCase(nodeRepository);
 
-        StepVerifier.create(useCase.execute(source.getId())).assertNext(r -> assertEquals("source", r.label())).verifyComplete();
-        StepVerifier.create(useCase.execute(target.getId())).expectError(NodeNotFoundException.class).verify();
+        StepVerifier.create(useCase.execute(source.getId(), source.getOrganisationId())).assertNext(r -> assertEquals("source", r.label())).verifyComplete();
+        StepVerifier.create(useCase.execute(target.getId(), target.getOrganisationId())).expectError(NodeNotFoundException.class).verify();
     }
 
     @Test
@@ -110,17 +110,17 @@ class TopologyUseCaseTest {
     @Test
     @DisplayName("Update node: persists with its audit entry, 404 when absent, 409 when RETIRED")
     void updateNode() {
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
-        when(nodeRepository.findById(target.getId())).thenReturn(Mono.empty());
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(target.getId(), target.getOrganisationId())).thenReturn(Mono.empty());
         when(nodeRepository.updateInfo(eq(source.getId()), eq("renamed"), any(), any())).thenReturn(Mono.empty());
         UpdateNodeUseCase useCase = new UpdateNodeUseCase(nodeRepository);
 
-        StepVerifier.create(useCase.execute(source.getId(), new UpdateNodeRequest("renamed", Map.of()), EXECUTOR)).verifyComplete();
-        StepVerifier.create(useCase.execute(target.getId(), new UpdateNodeRequest("x", Map.of()), EXECUTOR))
+        StepVerifier.create(useCase.execute(source.getId(), source.getOrganisationId(), new UpdateNodeRequest("renamed", Map.of()), EXECUTOR)).verifyComplete();
+        StepVerifier.create(useCase.execute(target.getId(), target.getOrganisationId(), new UpdateNodeRequest("x", Map.of()), EXECUTOR))
                 .expectError(NodeNotFoundException.class).verify();
 
         source.retire(EXECUTOR);
-        StepVerifier.create(useCase.execute(source.getId(), new UpdateNodeRequest("again", Map.of()), EXECUTOR))
+        StepVerifier.create(useCase.execute(source.getId(), source.getOrganisationId(), new UpdateNodeRequest("again", Map.of()), EXECUTOR))
                 .expectError(InvalidNodeStatusException.class).verify();
     }
 
@@ -129,17 +129,17 @@ class TopologyUseCaseTest {
     void controlNode() {
         assertEquals(ElementStatus.RETIRED, ControlNodeUseCase.Action.RETIRE.targetStatus());
         assertEquals(ElementStatus.ACTIVE, ControlNodeUseCase.Action.REACTIVATE.targetStatus());
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
-        when(nodeRepository.findById(target.getId())).thenReturn(Mono.empty());
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(target.getId(), target.getOrganisationId())).thenReturn(Mono.empty());
         when(nodeRepository.updateStatus(eq(source.getId()), any(ElementStatus.class), any())).thenReturn(Mono.empty());
         ControlNodeUseCase useCase = new ControlNodeUseCase(nodeRepository);
 
-        StepVerifier.create(useCase.execute(source.getId(), ControlNodeUseCase.Action.RETIRE, EXECUTOR)).verifyComplete();
-        StepVerifier.create(useCase.execute(source.getId(), ControlNodeUseCase.Action.REACTIVATE, EXECUTOR)).verifyComplete();
-        StepVerifier.create(useCase.execute(source.getId(), ControlNodeUseCase.Action.RETIRE, EXECUTOR)).verifyComplete();
-        StepVerifier.create(useCase.execute(source.getId(), ControlNodeUseCase.Action.RETIRE, EXECUTOR))
+        StepVerifier.create(useCase.execute(source.getId(), source.getOrganisationId(), ControlNodeUseCase.Action.RETIRE, EXECUTOR)).verifyComplete();
+        StepVerifier.create(useCase.execute(source.getId(), source.getOrganisationId(), ControlNodeUseCase.Action.REACTIVATE, EXECUTOR)).verifyComplete();
+        StepVerifier.create(useCase.execute(source.getId(), source.getOrganisationId(), ControlNodeUseCase.Action.RETIRE, EXECUTOR)).verifyComplete();
+        StepVerifier.create(useCase.execute(source.getId(), source.getOrganisationId(), ControlNodeUseCase.Action.RETIRE, EXECUTOR))
                 .expectError(InvalidNodeStatusException.class).verify();
-        StepVerifier.create(useCase.execute(target.getId(), ControlNodeUseCase.Action.REACTIVATE, EXECUTOR))
+        StepVerifier.create(useCase.execute(target.getId(), target.getOrganisationId(), ControlNodeUseCase.Action.REACTIVATE, EXECUTOR))
                 .expectError(NodeNotFoundException.class).verify();
         verify(nodeRepository, org.mockito.Mockito.times(2)).updateStatus(eq(source.getId()), eq(ElementStatus.RETIRED), any());
         verify(nodeRepository).updateStatus(eq(source.getId()), eq(ElementStatus.ACTIVE), any());
@@ -149,18 +149,18 @@ class TopologyUseCaseTest {
     @DisplayName("Node audit log: lists the ledger in order, 404 when absent")
     void nodeAuditLog() {
         source.retire(EXECUTOR);
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
-        when(nodeRepository.findById(target.getId())).thenReturn(Mono.empty());
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(target.getId(), target.getOrganisationId())).thenReturn(Mono.empty());
         RetrieveNodeAuditLogUseCase useCase = new RetrieveNodeAuditLogUseCase(nodeRepository);
 
-        StepVerifier.create(useCase.execute(source.getId()))
+        StepVerifier.create(useCase.execute(source.getId(), source.getOrganisationId()))
                 .assertNext(entries -> {
                     assertEquals(2, entries.size());
                     assertEquals("INITIATED", entries.get(0).action());
                     assertEquals("RETIRED", entries.get(1).action());
                 })
                 .verifyComplete();
-        StepVerifier.create(useCase.execute(target.getId())).expectError(NodeNotFoundException.class).verify();
+        StepVerifier.create(useCase.execute(target.getId(), target.getOrganisationId())).expectError(NodeNotFoundException.class).verify();
     }
 
     // ---------------------------------------------------------------- edges
@@ -169,8 +169,8 @@ class TopologyUseCaseTest {
     @DisplayName("Initiate edge: both endpoints ACTIVE in the tenant -> Sovereign ID spent, edge persisted")
     void initiateEdge() {
         UUID sovereignId = UUID.randomUUID();
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
-        when(nodeRepository.findById(target.getId())).thenReturn(Mono.just(target));
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(target.getId(), target.getOrganisationId())).thenReturn(Mono.just(target));
         when(hashServicePort.generateSovereignId("edge-creation")).thenReturn(Mono.just(sovereignId));
         when(edgeRepository.create(any(Edge.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
@@ -183,8 +183,8 @@ class TopologyUseCaseTest {
     @Test
     @DisplayName("Initiate edge: a missing endpoint is 404 and never spends a Sovereign ID")
     void initiateEdgeMissingEndpoint() {
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
-        when(nodeRepository.findById(target.getId())).thenReturn(Mono.empty());
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(target.getId(), target.getOrganisationId())).thenReturn(Mono.empty());
 
         StepVerifier.create(new InitiateEdgeUseCase(hashServicePort, nodeRepository, edgeRepository)
                         .execute(organisationId, new InitiateEdgeRequest("DEPENDS_ON", source.getId(), target.getId()), EXECUTOR))
@@ -198,8 +198,8 @@ class TopologyUseCaseTest {
     @DisplayName("Initiate edge: an endpoint of another tenant is reported as not found")
     void initiateEdgeForeignTenant() {
         Node foreign = Node.createNew(UUID.randomUUID(), UUID.randomUUID(), "ASSET", UUID.randomUUID(), "foreign", Map.of(), EXECUTOR);
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
-        when(nodeRepository.findById(foreign.getId())).thenReturn(Mono.just(foreign));
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(foreign.getId(), organisationId)).thenReturn(Mono.empty());
 
         StepVerifier.create(new InitiateEdgeUseCase(hashServicePort, nodeRepository, edgeRepository)
                         .execute(organisationId, new InitiateEdgeRequest("DEPENDS_ON", source.getId(), foreign.getId()), EXECUTOR))
@@ -211,8 +211,8 @@ class TopologyUseCaseTest {
     @DisplayName("Initiate edge: a RETIRED endpoint is a 409 and never spends a Sovereign ID")
     void initiateEdgeRetiredEndpoint() {
         target.retire(EXECUTOR);
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
-        when(nodeRepository.findById(target.getId())).thenReturn(Mono.just(target));
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(target.getId(), target.getOrganisationId())).thenReturn(Mono.just(target));
 
         StepVerifier.create(new InitiateEdgeUseCase(hashServicePort, nodeRepository, edgeRepository)
                         .execute(organisationId, new InitiateEdgeRequest("DEPENDS_ON", source.getId(), target.getId()), EXECUTOR))
@@ -223,13 +223,13 @@ class TopologyUseCaseTest {
     @Test
     @DisplayName("Retrieve edge: found, and 404 when absent")
     void retrieveEdge() {
-        when(edgeRepository.findById(edge.getId())).thenReturn(Mono.just(edge));
+        when(edgeRepository.findById(edge.getId(), edge.getOrganisationId())).thenReturn(Mono.just(edge));
         UUID unknown = UUID.randomUUID();
-        when(edgeRepository.findById(unknown)).thenReturn(Mono.empty());
+        when(edgeRepository.findById(unknown, organisationId)).thenReturn(Mono.empty());
         RetrieveEdgeUseCase useCase = new RetrieveEdgeUseCase(edgeRepository);
 
-        StepVerifier.create(useCase.execute(edge.getId())).assertNext(r -> assertEquals("DEPENDS_ON", r.relationshipType())).verifyComplete();
-        StepVerifier.create(useCase.execute(unknown)).expectError(EdgeNotFoundException.class).verify();
+        StepVerifier.create(useCase.execute(edge.getId(), edge.getOrganisationId())).assertNext(r -> assertEquals("DEPENDS_ON", r.relationshipType())).verifyComplete();
+        StepVerifier.create(useCase.execute(unknown, organisationId)).expectError(EdgeNotFoundException.class).verify();
     }
 
     @Test
@@ -248,14 +248,14 @@ class TopologyUseCaseTest {
     void controlEdge() {
         assertEquals(ElementStatus.RETIRED, ControlEdgeUseCase.Action.RETIRE.targetStatus());
         assertEquals(ElementStatus.ACTIVE, ControlEdgeUseCase.Action.REACTIVATE.targetStatus());
-        when(edgeRepository.findById(edge.getId())).thenReturn(Mono.just(edge));
+        when(edgeRepository.findById(edge.getId(), edge.getOrganisationId())).thenReturn(Mono.just(edge));
         when(edgeRepository.updateStatus(eq(edge.getId()), any(), any())).thenReturn(Mono.empty());
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
-        when(nodeRepository.findById(target.getId())).thenReturn(Mono.just(target));
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(target.getId(), target.getOrganisationId())).thenReturn(Mono.just(target));
         ControlEdgeUseCase useCase = new ControlEdgeUseCase(edgeRepository, nodeRepository);
 
-        StepVerifier.create(useCase.execute(edge.getId(), ControlEdgeUseCase.Action.RETIRE, EXECUTOR)).verifyComplete();
-        StepVerifier.create(useCase.execute(edge.getId(), ControlEdgeUseCase.Action.REACTIVATE, EXECUTOR)).verifyComplete();
+        StepVerifier.create(useCase.execute(edge.getId(), edge.getOrganisationId(), ControlEdgeUseCase.Action.RETIRE, EXECUTOR)).verifyComplete();
+        StepVerifier.create(useCase.execute(edge.getId(), edge.getOrganisationId(), ControlEdgeUseCase.Action.REACTIVATE, EXECUTOR)).verifyComplete();
         verify(edgeRepository).updateStatus(eq(edge.getId()), eq(ElementStatus.RETIRED), any());
         verify(edgeRepository).updateStatus(eq(edge.getId()), eq(ElementStatus.ACTIVE), any());
     }
@@ -264,19 +264,19 @@ class TopologyUseCaseTest {
     @DisplayName("Control edge: reactivation is refused while an endpoint is RETIRED or missing, and an unknown edge is 404")
     void controlEdgeGuards() {
         edge.retire(EXECUTOR);
-        when(edgeRepository.findById(edge.getId())).thenReturn(Mono.just(edge));
+        when(edgeRepository.findById(edge.getId(), edge.getOrganisationId())).thenReturn(Mono.just(edge));
         UUID unknown = UUID.randomUUID();
-        when(edgeRepository.findById(unknown)).thenReturn(Mono.empty());
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
-        when(nodeRepository.findById(target.getId())).thenReturn(Mono.just(target)).thenReturn(Mono.empty());
+        when(edgeRepository.findById(unknown, organisationId)).thenReturn(Mono.empty());
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(target.getId(), target.getOrganisationId())).thenReturn(Mono.just(target)).thenReturn(Mono.empty());
         target.retire(EXECUTOR);
         ControlEdgeUseCase useCase = new ControlEdgeUseCase(edgeRepository, nodeRepository);
 
-        StepVerifier.create(useCase.execute(edge.getId(), ControlEdgeUseCase.Action.REACTIVATE, EXECUTOR))
+        StepVerifier.create(useCase.execute(edge.getId(), edge.getOrganisationId(), ControlEdgeUseCase.Action.REACTIVATE, EXECUTOR))
                 .expectError(InvalidNodeStatusException.class).verify();
-        StepVerifier.create(useCase.execute(edge.getId(), ControlEdgeUseCase.Action.REACTIVATE, EXECUTOR))
+        StepVerifier.create(useCase.execute(edge.getId(), edge.getOrganisationId(), ControlEdgeUseCase.Action.REACTIVATE, EXECUTOR))
                 .expectError(NodeNotFoundException.class).verify();
-        StepVerifier.create(useCase.execute(unknown, ControlEdgeUseCase.Action.RETIRE, EXECUTOR))
+        StepVerifier.create(useCase.execute(unknown, organisationId, ControlEdgeUseCase.Action.RETIRE, EXECUTOR))
                 .expectError(EdgeNotFoundException.class).verify();
         verify(edgeRepository, never()).updateStatus(any(), any(), any());
     }
@@ -284,13 +284,13 @@ class TopologyUseCaseTest {
     @Test
     @DisplayName("Edge audit log: lists the ledger, 404 when absent")
     void edgeAuditLog() {
-        when(edgeRepository.findById(edge.getId())).thenReturn(Mono.just(edge));
+        when(edgeRepository.findById(edge.getId(), edge.getOrganisationId())).thenReturn(Mono.just(edge));
         UUID unknown = UUID.randomUUID();
-        when(edgeRepository.findById(unknown)).thenReturn(Mono.empty());
+        when(edgeRepository.findById(unknown, organisationId)).thenReturn(Mono.empty());
         RetrieveEdgeAuditLogUseCase useCase = new RetrieveEdgeAuditLogUseCase(edgeRepository);
 
-        StepVerifier.create(useCase.execute(edge.getId())).assertNext(entries -> assertEquals(1, entries.size())).verifyComplete();
-        StepVerifier.create(useCase.execute(unknown)).expectError(EdgeNotFoundException.class).verify();
+        StepVerifier.create(useCase.execute(edge.getId(), edge.getOrganisationId())).assertNext(entries -> assertEquals(1, entries.size())).verifyComplete();
+        StepVerifier.create(useCase.execute(unknown, organisationId)).expectError(EdgeNotFoundException.class).verify();
     }
 
     // ---------------------------------------------------------------- blast radius
@@ -308,7 +308,7 @@ class TopologyUseCaseTest {
     void blastRadiusDownstream() {
         Node a = node("alpha");
         Node b = node("beta");
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
         when(graphTraversalPort.traverse(organisationId, source.getId(), 3, TraversalDirection.DOWNSTREAM)).thenReturn(Mono.just(new TraversalResult(
                 List.of(new EdgeHop(source.getId(), b.getId(), 1), new EdgeHop(source.getId(), a.getId(), 0), new EdgeHop(a.getId(), b.getId(), 1),
                         new EdgeHop(b.getId(), source.getId(), 2)),
@@ -337,7 +337,7 @@ class TopologyUseCaseTest {
         Node downFirst = node("down-first");
         Node upFirst = node("up-first");
         Node upOnly = node("up-only");
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.just(source));
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.just(source));
         when(graphTraversalPort.traverse(organisationId, source.getId(), 4, TraversalDirection.BOTH)).thenReturn(Mono.just(new TraversalResult(
                 List.of(new EdgeHop(source.getId(), same.getId(), 0), new EdgeHop(source.getId(), downFirst.getId(), 0),
                         new EdgeHop(source.getId(), upFirst.getId(), 2)),
@@ -362,8 +362,8 @@ class TopologyUseCaseTest {
     @DisplayName("Blast radius: a node that does not exist or belongs to another tenant is 404 and never traversed")
     void blastRadiusNotFound() {
         Node foreign = Node.createNew(UUID.randomUUID(), UUID.randomUUID(), "ASSET", UUID.randomUUID(), "foreign", Map.of(), EXECUTOR);
-        when(nodeRepository.findById(source.getId())).thenReturn(Mono.empty());
-        when(nodeRepository.findById(foreign.getId())).thenReturn(Mono.just(foreign));
+        when(nodeRepository.findById(source.getId(), source.getOrganisationId())).thenReturn(Mono.empty());
+        when(nodeRepository.findById(foreign.getId(), organisationId)).thenReturn(Mono.empty());
 
         StepVerifier.create(blastRadius().execute(organisationId, source.getId(), 2, TraversalDirection.BOTH))
                 .expectError(NodeNotFoundException.class).verify();
@@ -378,5 +378,21 @@ class TopologyUseCaseTest {
         StepVerifier.create(blastRadius().execute(organisationId, source.getId(), 0, null)).expectError(IllegalArgumentException.class).verify();
         StepVerifier.create(blastRadius().execute(organisationId, source.getId(), 11, null)).expectError(IllegalArgumentException.class).verify();
         verifyNoInteractions(nodeRepository, graphTraversalPort);
+    }
+
+    @Test
+    @DisplayName("every by-id lookup is made in the caller's tenant: another tenant's node or edge is the same as none and nothing is written")
+    void anotherTenantsObjects() {
+        UUID id = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        when(nodeRepository.findById(id, other)).thenReturn(Mono.empty());
+        when(edgeRepository.findById(id, other)).thenReturn(Mono.empty());
+
+        StepVerifier.create(new RetrieveNodeUseCase(nodeRepository).execute(id, other)).expectError(NodeNotFoundException.class).verify();
+        StepVerifier.create(new RetrieveEdgeUseCase(edgeRepository).execute(id, other)).expectError(EdgeNotFoundException.class).verify();
+        StepVerifier.create(new ControlNodeUseCase(nodeRepository).execute(id, other, ControlNodeUseCase.Action.RETIRE, EXECUTOR)).expectError(NodeNotFoundException.class).verify();
+        StepVerifier.create(new ControlEdgeUseCase(edgeRepository, nodeRepository).execute(id, other, ControlEdgeUseCase.Action.RETIRE, EXECUTOR)).expectError(EdgeNotFoundException.class).verify();
+
+        org.mockito.Mockito.verifyNoMoreInteractions(nodeRepository, edgeRepository);
     }
 }

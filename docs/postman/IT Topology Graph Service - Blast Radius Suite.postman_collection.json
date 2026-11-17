@@ -473,7 +473,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/it-topology-graph/v1/{{webId}}/retrieve",
               "host": [
@@ -707,6 +712,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "url": {
@@ -746,6 +755,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "url": {
@@ -831,6 +844,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "url": {
@@ -870,7 +887,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/it-topology-graph/v1/{{appId}}/audit-log/retrieve",
               "host": [
@@ -1087,7 +1109,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/it-topology-graph/v1/00000000-0000-0000-0000-000000000000/retrieve",
               "host": [
@@ -1117,7 +1144,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/it-topology-graph/v1/not-a-uuid/retrieve",
               "host": [
@@ -1452,6 +1484,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "url": {
@@ -1493,6 +1529,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "url": {
@@ -1538,6 +1578,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "url": {
@@ -1629,6 +1673,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "url": {
@@ -1671,6 +1719,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "url": {
@@ -1686,6 +1738,220 @@
                 "control",
                 "reactivate"
               ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Tenant Isolation on the By-Id Routes",
+      "item": [
+        {
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('otherOrganisationId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 (another tenant\\'s object is the same as none)', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "90. Read it as another tenant (404)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{otherOrganisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{webId}}",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-topology-graph/v1/{{webId}}/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 (another tenant\\'s object is the same as none)', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "91. Its audit log as another tenant (404)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{otherOrganisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{webId}}",
+                "audit-log",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-topology-graph/v1/{{webId}}/audit-log/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 (another tenant\\'s object is the same as none)', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "92. Change it as another tenant (404)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{otherOrganisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "{{webId}}",
+                "control",
+                "retire"
+              ],
+              "raw": "{{base_url}}/it-topology-graph/v1/{{webId}}/control/retire"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 (another tenant\\'s object is the same as none)', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "93. Read an edge as another tenant (404)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{otherOrganisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "{{webAppEdgeId}}",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/{{webAppEdgeId}}/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 (another tenant\\'s object is the same as none)', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "94. Retire an edge as another tenant (404)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{otherOrganisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-topology-graph",
+                "v1",
+                "edge",
+                "{{webAppEdgeId}}",
+                "control",
+                "retire"
+              ],
+              "raw": "{{base_url}}/it-topology-graph/v1/edge/{{webAppEdgeId}}/control/retire"
             }
           }
         }

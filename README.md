@@ -47,7 +47,7 @@ Retiring a Node does not cascade to its Edges: impact results only list ACTIVE N
 
 ## BIAN Behavior Qualifier Contract (`/it-topology-graph/v1`)
 
-`X-Tenant-Id` is mandatory on `initiate`, collection `retrieve` and `blast-radius/retrieve`;
+`X-Tenant-Id` is mandatory on every route (ADR-034: another tenant's node or edge is a 404);
 `X-Executor` is mandatory on every mutation. There is no `DELETE`.
 
 | Behavior Qualifier | Method & Path |

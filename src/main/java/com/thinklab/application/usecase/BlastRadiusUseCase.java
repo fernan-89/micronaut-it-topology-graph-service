@@ -53,8 +53,7 @@ public class BlastRadiusUseCase {
         }
         log.info("[USE CASE] Blast radius for node: {} organisation: {} maxHops: {} direction: {}", nodeId, organisationId, maxHops, direction);
 
-        return nodeRepository.findById(nodeId)
-                .filter(node -> node.getOrganisationId().equals(organisationId))
+        return nodeRepository.findById(nodeId, organisationId)
                 .switchIfEmpty(Mono.error(new NodeNotFoundException(nodeId)))
                 .then(Mono.defer(() -> graphTraversalPort.traverse(organisationId, nodeId, maxHops, direction)))
                 .flatMap(result -> {

@@ -40,16 +40,17 @@ class TransitionRaceIT implements TestPropertyProvider {
     @Test
     @DisplayName("ten retirements of one node at once: exactly one wins, the others are refused with a conflict")
     void tenRetirementsAtOnce() {
-        Node node = nodes.create(Node.createNew(UUID.randomUUID(), UUID.randomUUID(), "ASSET", UUID.randomUUID(), "db-01", Map.of(), EXECUTOR)).block();
+        UUID organisationId = UUID.randomUUID();
+        Node node = nodes.create(Node.createNew(UUID.randomUUID(), organisationId, "ASSET", UUID.randomUUID(), "db-01", Map.of(), EXECUTOR)).block();
 
         List<String> results = Flux.range(0, 10)
-                .flatMap(i -> control.execute(node.getId(), ControlNodeUseCase.Action.RETIRE, EXECUTOR).thenReturn("OK")
+                .flatMap(i -> control.execute(node.getId(), organisationId, ControlNodeUseCase.Action.RETIRE, EXECUTOR).thenReturn("OK")
                         .onErrorResume(e -> Mono.just(e.getClass().getSimpleName())), 10)
                 .collectList().block(Duration.ofSeconds(30));
 
         assertEquals(1, results.stream().filter("OK"::equals).count(), results.toString());
         assertEquals(9, results.stream().filter(InvalidNodeStatusException.class.getSimpleName()::equals).count(), results.toString());
-        Node stored = nodes.findById(node.getId()).block();
+        Node stored = nodes.findById(node.getId(), organisationId).block();
         assertEquals(ElementStatus.RETIRED, stored.getStatus());
         assertEquals(2, stored.getAuditTrail().size(), "one entry for creating and one for the single retire that won");
     }

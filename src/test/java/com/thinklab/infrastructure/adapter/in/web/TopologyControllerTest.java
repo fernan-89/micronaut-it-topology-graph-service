@@ -50,6 +50,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TopologyControllerTest {
 
+    private static final String TENANT = UUID.randomUUID().toString();
+
     private static final String EXECUTOR = "ops-admin";
 
     @Mock private InitiateNodeUseCase initiateNodeUseCase;
@@ -99,10 +101,10 @@ class TopologyControllerTest {
     @Test
     @DisplayName("retrieveById returns 200 and surfaces not-found")
     void retrieveById() {
-        when(retrieveNodeUseCase.execute(id)).thenReturn(Mono.just(node)).thenReturn(Mono.error(new NodeNotFoundException(id)));
+        when(retrieveNodeUseCase.execute(id, UUID.fromString(TENANT))).thenReturn(Mono.just(node)).thenReturn(Mono.error(new NodeNotFoundException(id)));
 
-        StepVerifier.create(controller.retrieveById(id)).assertNext(r -> assertEquals(HttpStatus.OK, r.getStatus())).verifyComplete();
-        StepVerifier.create(controller.retrieveById(id)).expectError(NodeNotFoundException.class).verify();
+        StepVerifier.create(controller.retrieveById(id, TENANT)).assertNext(r -> assertEquals(HttpStatus.OK, r.getStatus())).verifyComplete();
+        StepVerifier.create(controller.retrieveById(id, TENANT)).expectError(NodeNotFoundException.class).verify();
     }
 
     @Test
@@ -119,23 +121,23 @@ class TopologyControllerTest {
     @DisplayName("update, retire and reactivate return 204 and dispatch the right action")
     void nodeMutations() {
         UpdateNodeRequest request = new UpdateNodeRequest("sw2", Map.of());
-        when(updateNodeUseCase.execute(id, request, EXECUTOR)).thenReturn(Mono.empty());
-        when(controlNodeUseCase.execute(eq(id), any(ControlNodeUseCase.Action.class), eq(EXECUTOR))).thenReturn(Mono.empty());
+        when(updateNodeUseCase.execute(id, UUID.fromString(TENANT), request, EXECUTOR)).thenReturn(Mono.empty());
+        when(controlNodeUseCase.execute(eq(id), eq(UUID.fromString(TENANT)), any(ControlNodeUseCase.Action.class), eq(EXECUTOR))).thenReturn(Mono.empty());
 
-        StepVerifier.create(controller.update(id, EXECUTOR, request)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
-        StepVerifier.create(controller.controlRetire(id, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
-        StepVerifier.create(controller.controlReactivate(id, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
-        verify(controlNodeUseCase).execute(id, ControlNodeUseCase.Action.RETIRE, EXECUTOR);
-        verify(controlNodeUseCase).execute(id, ControlNodeUseCase.Action.REACTIVATE, EXECUTOR);
+        StepVerifier.create(controller.update(id, TENANT, EXECUTOR, request)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
+        StepVerifier.create(controller.controlRetire(id, TENANT, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
+        StepVerifier.create(controller.controlReactivate(id, TENANT, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
+        verify(controlNodeUseCase).execute(id, UUID.fromString(TENANT), ControlNodeUseCase.Action.RETIRE, EXECUTOR);
+        verify(controlNodeUseCase).execute(id, UUID.fromString(TENANT), ControlNodeUseCase.Action.REACTIVATE, EXECUTOR);
     }
 
     @Test
     @DisplayName("retrieveAuditLog lists the node ledger")
     void nodeAuditLog() {
         AuditEntryResponse entry = new AuditEntryResponse(Instant.now(), "INITIATED", EXECUTOR, null, "ACTIVE", "d");
-        when(retrieveNodeAuditLogUseCase.execute(id)).thenReturn(Mono.just(List.of(entry)));
+        when(retrieveNodeAuditLogUseCase.execute(id, UUID.fromString(TENANT))).thenReturn(Mono.just(List.of(entry)));
 
-        StepVerifier.create(controller.retrieveAuditLog(id)).expectNext(List.of(entry)).verifyComplete();
+        StepVerifier.create(controller.retrieveAuditLog(id, TENANT)).expectNext(List.of(entry)).verifyComplete();
     }
 
     @Test
@@ -162,10 +164,10 @@ class TopologyControllerTest {
     @Test
     @DisplayName("retrieveEdgeById returns 200 and surfaces not-found")
     void retrieveEdgeById() {
-        when(retrieveEdgeUseCase.execute(id)).thenReturn(Mono.just(edge)).thenReturn(Mono.error(new EdgeNotFoundException(id)));
+        when(retrieveEdgeUseCase.execute(id, UUID.fromString(TENANT))).thenReturn(Mono.just(edge)).thenReturn(Mono.error(new EdgeNotFoundException(id)));
 
-        StepVerifier.create(controller.retrieveEdgeById(id)).assertNext(r -> assertEquals(HttpStatus.OK, r.getStatus())).verifyComplete();
-        StepVerifier.create(controller.retrieveEdgeById(id)).expectError(EdgeNotFoundException.class).verify();
+        StepVerifier.create(controller.retrieveEdgeById(id, TENANT)).assertNext(r -> assertEquals(HttpStatus.OK, r.getStatus())).verifyComplete();
+        StepVerifier.create(controller.retrieveEdgeById(id, TENANT)).expectError(EdgeNotFoundException.class).verify();
     }
 
     @Test
@@ -184,20 +186,20 @@ class TopologyControllerTest {
     @Test
     @DisplayName("edge retire and reactivate return 204 and dispatch the right action")
     void edgeMutations() {
-        when(controlEdgeUseCase.execute(eq(id), any(ControlEdgeUseCase.Action.class), eq(EXECUTOR))).thenReturn(Mono.empty());
+        when(controlEdgeUseCase.execute(eq(id), eq(UUID.fromString(TENANT)), any(ControlEdgeUseCase.Action.class), eq(EXECUTOR))).thenReturn(Mono.empty());
 
-        StepVerifier.create(controller.controlEdgeRetire(id, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
-        StepVerifier.create(controller.controlEdgeReactivate(id, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
-        verify(controlEdgeUseCase).execute(id, ControlEdgeUseCase.Action.RETIRE, EXECUTOR);
-        verify(controlEdgeUseCase).execute(id, ControlEdgeUseCase.Action.REACTIVATE, EXECUTOR);
+        StepVerifier.create(controller.controlEdgeRetire(id, TENANT, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
+        StepVerifier.create(controller.controlEdgeReactivate(id, TENANT, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
+        verify(controlEdgeUseCase).execute(id, UUID.fromString(TENANT), ControlEdgeUseCase.Action.RETIRE, EXECUTOR);
+        verify(controlEdgeUseCase).execute(id, UUID.fromString(TENANT), ControlEdgeUseCase.Action.REACTIVATE, EXECUTOR);
     }
 
     @Test
     @DisplayName("retrieveEdgeAuditLog lists the edge ledger")
     void edgeAuditLog() {
         AuditEntryResponse entry = new AuditEntryResponse(Instant.now(), "INITIATED", EXECUTOR, null, "ACTIVE", "d");
-        when(retrieveEdgeAuditLogUseCase.execute(id)).thenReturn(Mono.just(List.of(entry)));
+        when(retrieveEdgeAuditLogUseCase.execute(id, UUID.fromString(TENANT))).thenReturn(Mono.just(List.of(entry)));
 
-        StepVerifier.create(controller.retrieveEdgeAuditLog(id)).expectNext(List.of(entry)).verifyComplete();
+        StepVerifier.create(controller.retrieveEdgeAuditLog(id, TENANT)).expectNext(List.of(entry)).verifyComplete();
     }
 }

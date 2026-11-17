@@ -19,8 +19,8 @@ public class UpdateNodeUseCase {
         this.nodeRepository = nodeRepository;
     }
 
-    public Mono<Void> execute(UUID id, UpdateNodeRequest request, String executor) {
-        return nodeRepository.findById(id)
+    public Mono<Void> execute(UUID id, UUID organisationId, UpdateNodeRequest request, String executor) {
+        return nodeRepository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new NodeNotFoundException(id)))
                 .flatMap(node -> {
                     AuditEntry entry = node.update(request.label(), request.attributes(), executor);

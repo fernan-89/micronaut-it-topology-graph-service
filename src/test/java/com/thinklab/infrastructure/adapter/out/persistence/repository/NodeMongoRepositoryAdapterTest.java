@@ -136,8 +136,8 @@ class NodeMongoRepositoryAdapterTest {
         when(mongoCollection.find(any(Bson.class))).thenReturn(publisher);
         when(publisher.first()).thenReturn(Mono.just(NodePersistenceMapper.toDocument(node))).thenReturn(Mono.empty());
 
-        StepVerifier.create(adapter.findById(node.getId())).expectNextMatches(n -> n.getId().equals(node.getId())).verifyComplete();
-        StepVerifier.create(adapter.findById(node.getId())).verifyComplete();
+        StepVerifier.create(adapter.findById(node.getId(), node.getOrganisationId())).expectNextMatches(n -> n.getId().equals(node.getId())).verifyComplete();
+        StepVerifier.create(adapter.findById(node.getId(), node.getOrganisationId())).verifyComplete();
     }
 
     @Test

@@ -49,8 +49,7 @@ public class InitiateEdgeUseCase {
     }
 
     private Mono<Node> activeEndpoint(UUID organisationId, UUID nodeId) {
-        return nodeRepository.findById(nodeId)
-                .filter(node -> node.getOrganisationId().equals(organisationId))
+        return nodeRepository.findById(nodeId, organisationId)
                 .switchIfEmpty(Mono.error(new NodeNotFoundException(nodeId)))
                 .flatMap(node -> node.getStatus() == ElementStatus.ACTIVE
                         ? Mono.just(node)

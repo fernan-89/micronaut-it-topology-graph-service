@@ -19,8 +19,8 @@ public class RetrieveNodeUseCase {
         this.nodeRepository = nodeRepository;
     }
 
-    public Mono<NodeResponse> execute(UUID id) {
-        return nodeRepository.findById(id)
+    public Mono<NodeResponse> execute(UUID id, UUID organisationId) {
+        return nodeRepository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new NodeNotFoundException(id)))
                 .map(TopologyMapper::toResponse);
     }

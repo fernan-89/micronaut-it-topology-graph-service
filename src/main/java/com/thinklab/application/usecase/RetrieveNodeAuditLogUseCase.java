@@ -21,8 +21,8 @@ public class RetrieveNodeAuditLogUseCase {
         this.nodeRepository = nodeRepository;
     }
 
-    public Mono<List<AuditEntryResponse>> execute(UUID id) {
-        return nodeRepository.findById(id)
+    public Mono<List<AuditEntryResponse>> execute(UUID id, UUID organisationId) {
+        return nodeRepository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new NodeNotFoundException(id)))
                 .flatMapMany(node -> Flux.fromIterable(node.getAuditTrail()))
                 .map(TopologyMapper::toResponse)
